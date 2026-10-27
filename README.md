@@ -74,7 +74,7 @@ Send them the `dist/Invitation Card Maker/` folder. On Windows they double-click
 
 ## Privacy
 
-Guest lists, generated cards, invitation artwork and licensed fonts are excluded in `.gitignore`.
+Guest lists, generated cards, invitation artwork, licensed fonts and other sensitive details are excluded in `.gitignore`.
 
 ## License
 
