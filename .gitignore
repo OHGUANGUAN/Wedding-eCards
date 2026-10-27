@@ -1,0 +1,48 @@
+# --- Personal / private data (never commit) ---
+attendees.xlsx
+*.xlsx
+*.xls
+*.csv
+personalized_cards/
+enhanced_personalized_cards/
+# Base invitation artwork (contains names, venue and date)
+*.jpg
+*.jpeg
+*.JPG
+*.JPEG
+*.png
+
+# --- Licensed / demo fonts (not redistributable) ---
+Fontspring-DEMO-*.otf
+Valentine Baby.otf
+# Only the open-licence fonts in fonts/ are published
+*.otf
+*.ttf
+!fonts/*.ttf
+
+# --- Secrets / personal settings ---
+# The app saves its settings in your user profile (%APPDATA%), not here; ignored in case a copy lands here
+settings.json
+.env
+.env*.local
+*.env
+
+# --- Large model files ---
+*.pb
+
+# --- Python / PyInstaller ---
+build/
+dist/
+*.spec
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+

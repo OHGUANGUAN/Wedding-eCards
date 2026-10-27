@@ -1,0 +1,3 @@
+Pillow
+openpyxl
+customtkinter>=5.2,<7
