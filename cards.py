@@ -15,7 +15,6 @@ from PIL import Image, ImageDraw, ImageFont
 # Works both from source and inside a PyInstaller bundle
 BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 FONTS_DIR = BASE_DIR / "fonts"
-WINDOWS_FONTS_DIR = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts"
 
 MIN_FONT_SIZE = 10
 CHINESE_CHARS = re.compile(r"[\u3400-\u9fff\uf900-\ufaff]")
@@ -41,10 +40,16 @@ BUILT_IN_FONTS = [
     FontChoice("Lato  (modern)", FONTS_DIR / "Lato-Regular.ttf"),
 ]
 
-# Chinese fonts are too large to bundle, so use the ones Windows ships with
+# Chinese fonts are too large to bundle, so use the ones the operating system ships with
+_WIN = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts"
+_MAC = Path("/System/Library/Fonts")
 SYSTEM_CHINESE_FONTS = [
-    FontChoice("KaiTi 楷体  (Chinese brush)", WINDOWS_FONTS_DIR / "simkai.ttf", chinese=True),
-    FontChoice("Microsoft YaHei 微软雅黑  (Chinese modern)", WINDOWS_FONTS_DIR / "msyh.ttc", chinese=True),
+    FontChoice(label, path, chinese=True) for label, path in [
+        ("KaiTi 楷体  (Chinese brush)", _WIN / "simkai.ttf"),
+        ("Microsoft YaHei 微软雅黑  (Chinese modern)", _WIN / "msyh.ttc"),
+        ("Heiti 黑体  (Chinese modern)", _MAC / "STHeiti Medium.ttc"),
+        ("Hiragino Sans GB 冬青黑体  (Chinese modern)", _MAC / "Hiragino Sans GB.ttc"),
+    ]
 ]
 
 

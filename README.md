@@ -31,9 +31,9 @@ These fonts are built in. All are free under the [SIL Open Font License](fonts/l
 | Script | Alex Brush, Great Vibes, Parisienne, Pinyon Script, Allura, Dancing Script |
 | Classic | Cormorant Garamond, Playfair Display |
 | Modern | Lato |
-| Chinese (Windows only) | KaiTi 楷体, Microsoft YaHei 微软雅黑. These ship with Windows and are not bundled. |
+| Chinese | Windows: KaiTi 楷体, Microsoft YaHei 微软雅黑. macOS: Heiti 黑体, Hiragino Sans GB 冬青黑体. These ship with the operating system and are not bundled. |
 
-Names written in Chinese automatically switch to KaiTi when an English-only font is selected, so they never show as empty boxes.
+Names written in Chinese automatically switch to a Chinese font (KaiTi on Windows, Heiti on macOS) when an English-only font is selected, so they never show as empty boxes.
 
 ## Quick start (Windows)
 
@@ -42,9 +42,16 @@ Names written in Chinese automatically switch to KaiTi when an English-only font
 
 The first launch (and the first launch after an update) takes a minute while it installs what the app needs into a private `.venv` folder. After that, the app opens straight away. To reinstall from scratch, delete the `.venv` folder.
 
+## Quick start (macOS)
+
+1. Install [Python 3](https://www.python.org/downloads/) from python.org. Its installer includes Tkinter, which the app needs. If you use Homebrew Python instead, also run `brew install python-tk`.
+2. Double-click **`Invitation Card Maker.command`**.
+
+The first launch sets up `.venv` the same way as on Windows. If macOS says the file can't be opened because it's from an unidentified developer, right-click it and choose **Open**. If it says you don't have permission, run `chmod +x "Invitation Card Maker.command"` once in Terminal.
+
 ## Run from source
 
-Requires Python 3.9 or newer, with Tkinter. Tkinter is included in the python.org installers. On Linux, install `python3-tk`.
+Requires Python 3.9 or newer, with Tkinter. Tkinter is included in the python.org installers for Windows and macOS. On Linux, install `python3-tk`.
 
 ```bash
 pip install -r requirements.txt
@@ -60,13 +67,14 @@ pip install pyinstaller
 python build.py
 ```
 
-Send them the `dist/Invitation Card Maker/` folder. On Windows they double-click `Invitation Card Maker.exe`. PyInstaller builds for the operating system it runs on, so build on Windows for Windows and on macOS for macOS.
+On Windows, send them the `dist/Invitation Card Maker/` folder; they double-click `Invitation Card Maker.exe`. On macOS, send them `dist/Invitation Card Maker.app`. PyInstaller builds for the operating system it runs on, so build on Windows for Windows and on macOS for macOS.
 
 ## Project layout
 
 | File | Purpose |
 | --- | --- |
 | `Invitation Card Maker.bat` | Windows launcher: sets up `.venv` on first run, then starts the app |
+| `Invitation Card Maker.command` | The same launcher for macOS |
 | `invitation_app.py` | The desktop window (CustomTkinter) and saved settings |
 | `cards.py` | Name fitting, Excel reading and template creation |
 | `fonts/` | Bundled fonts, with their licences in `fonts/licenses/` |
@@ -80,4 +88,4 @@ Guest lists, generated cards, invitation artwork, licensed fonts and other sensi
 
 The code is released under the [MIT License](LICENSE).
 
-The bundled fonts in `fonts/` are not covered by the MIT License. Each keeps its own [SIL Open Font License](fonts/licenses/), which allows free use and redistribution but not selling the fonts on their own. The Chinese fonts belong to Microsoft and come with Windows; they are not included in this repository.
+The bundled fonts in `fonts/` are not covered by the MIT License. Each keeps its own [SIL Open Font License](fonts/licenses/), which allows free use and redistribution but not selling the fonts on their own. The Chinese fonts belong to Microsoft and Apple and come with Windows and macOS; they are not included in this repository.

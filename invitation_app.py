@@ -14,36 +14,26 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageTk
 import cards
 
 APP_NAME = "Invitation Card Maker"
-PLACEMENT_FIELDS = [
-    ("x_center", "Centre X"),
-    ("base_y", "Top Y"),
-    ("x_min", "Left limit"),
-    ("max_y", "Max Y"),
-    ("x_max", "Right limit"),
-    ("max_font_size", "Max font size"),
-]
+IS_WINDOWS, IS_MAC = sys.platform == "win32", sys.platform == "darwin"
+PLACEMENT_FIELDS = {
+    "x_center": "Centre X", "base_y": "Top Y", "x_min": "Left limit",
+    "max_y": "Max Y", "x_max": "Right limit", "max_font_size": "Max font size",
+}
 PREVIEW_PLACEHOLDER = "Guest Name"
 EXCEL_TYPES = [("Excel workbook", "*.xlsx")]
 
 # --- Palette ---
-BG = "#F7F1EC"
-CARD = "#FFFFFF"
-FIELD = "#FBF8F6"
-BORDER = "#EADFD6"
-ACCENT = "#B5735C"
-ACCENT_HOVER = "#9C5E49"
-ACCENT_SOFT = "#F3E4DC"
-TEXT = "#2F2A27"
-MUTED = "#8A7F78"
-PREVIEW_BG = "#EDE6E0"
+BG, CARD, FIELD, BORDER = "#F7F1EC", "#FFFFFF", "#FBF8F6", "#EADFD6"
+ACCENT, ACCENT_HOVER, ACCENT_SOFT = "#B5735C", "#9C5E49", "#F3E4DC"
+TEXT, MUTED, PREVIEW_BG = "#2F2A27", "#8A7F78", "#EDE6E0"
 
 
 # --- Settings (saved in the user's profile, never in the project folder) ---
 
 def settings_path():
-    if sys.platform == "win32":
+    if IS_WINDOWS:
         base = Path(os.environ.get("APPDATA", Path.home()))
-    elif sys.platform == "darwin":
+    elif IS_MAC:
         base = Path.home() / "Library" / "Application Support"
     else:
         base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
@@ -69,12 +59,14 @@ def save_settings(data):
 
 
 def open_folder(path):
-    if sys.platform == "win32":
+    if IS_WINDOWS:
         os.startfile(path)
-    elif sys.platform == "darwin":
-        subprocess.run(["open", path])
     else:
-        subprocess.run(["xdg-open", path])
+        subprocess.run(["open" if IS_MAC else "xdg-open", str(path)])
+
+
+def plural(n, word):
+    return f"{n} {word}{'' if n == 1 else 's'}"
 
 
 # --- Styled widgets ---
@@ -83,62 +75,56 @@ def font(size=13, weight="normal"):
     return ctk.CTkFont(size=size, weight=weight)
 
 
-def primary_button(parent, text, command, **kw):
-    kw = {"height": 34, "font": font(13, "bold"), **kw}
-    return ctk.CTkButton(
-        parent, text=text, command=command, fg_color=ACCENT, hover_color=ACCENT_HOVER,
-        text_color="white", corner_radius=8, **kw,
-    )
+BUTTON_STYLES = {
+    "primary": lambda: dict(fg_color=ACCENT, hover_color=ACCENT_HOVER, text_color="white", font=font(13, "bold")),
+    "secondary": lambda: dict(fg_color="transparent", hover_color=ACCENT_SOFT, border_width=1, border_color=ACCENT,
+                              text_color=ACCENT, font=font(13)),
+    "link": lambda: dict(fg_color="transparent", hover_color=ACCENT_SOFT, text_color=ACCENT, height=26, width=0,
+                         anchor="w", font=font(12, "bold")),
+}
 
 
-def secondary_button(parent, text, command, **kw):
-    kw = {"height": 34, "font": font(13), **kw}
-    return ctk.CTkButton(
-        parent, text=text, command=command, fg_color="transparent", hover_color=ACCENT_SOFT,
-        border_width=1, border_color=ACCENT, text_color=ACCENT, corner_radius=8, **kw,
-    )
+def button(parent, text, command, style="primary", **kw):
+    return ctk.CTkButton(parent, text=text, command=command,
+                         **{"height": 34, "corner_radius": 8, **BUTTON_STYLES[style](), **kw})
 
 
-def link_button(parent, text, command):
-    return ctk.CTkButton(
-        parent, text=text, command=command, fg_color="transparent", hover_color=ACCENT_SOFT,
-        text_color=ACCENT, height=26, width=0, anchor="w", font=font(12, "bold"),
-    )
+def label(parent, text="", size=12, weight="normal", color=TEXT, **kw):
+    return ctk.CTkLabel(parent, text=text, text_color=color, font=font(size, weight), **kw)
 
 
-def muted_label(parent, **kw):
-    kw.setdefault("wraplength", 330)
-    return ctk.CTkLabel(parent, text_color=MUTED, font=font(12), anchor="w", justify="left", **kw)
+def muted_label(parent, wraplength=330, **kw):
+    return label(parent, color=MUTED, anchor="w", justify="left", wraplength=wraplength, **kw)
+
+
+def row(parent, **pack):
+    frame = ctk.CTkFrame(parent, fg_color="transparent")
+    frame.pack(fill="x", **pack)
+    return frame
 
 
 def entry(parent, var, **kw):
-    return ctk.CTkEntry(
-        parent, textvariable=var, fg_color=FIELD, border_color=BORDER, text_color=TEXT, corner_radius=8, **kw
-    )
+    return ctk.CTkEntry(parent, textvariable=var, fg_color=FIELD, border_color=BORDER, text_color=TEXT,
+                        corner_radius=8, **kw)
 
 
-def option_menu(parent, var, values, **kw):
+def option_menu(parent, var, values):
     return ctk.CTkOptionMenu(
         parent, variable=var, values=values, fg_color=FIELD, button_color=BORDER, button_hover_color=ACCENT_SOFT,
         text_color=TEXT, dropdown_fg_color=CARD, dropdown_hover_color=ACCENT_SOFT, dropdown_text_color=TEXT,
-        corner_radius=8, dynamic_resizing=False, anchor="w", font=font(13), **kw,
+        corner_radius=8, dynamic_resizing=False, anchor="w", font=font(13),
     )
 
 
 def step_card(parent, number, title):
     """A white rounded card with a numbered heading; returns the body frame."""
-    frame = ctk.CTkFrame(parent, fg_color=CARD, border_color=BORDER, border_width=1, corner_radius=14)
-    frame.pack(fill="x", pady=(0, 12), padx=(0, 6))
-    header = ctk.CTkFrame(frame, fg_color="transparent")
-    header.pack(fill="x", padx=16, pady=(14, 8))
-    ctk.CTkLabel(
-        header, text=str(number), width=26, height=26, corner_radius=13,
-        fg_color=ACCENT, text_color="white", font=font(13, "bold"),
-    ).pack(side="left")
-    ctk.CTkLabel(header, text=title, text_color=TEXT, font=font(15, "bold")).pack(side="left", padx=(10, 0))
-    body = ctk.CTkFrame(frame, fg_color="transparent")
-    body.pack(fill="x", padx=16, pady=(0, 14))
-    return body
+    card = ctk.CTkFrame(parent, fg_color=CARD, border_color=BORDER, border_width=1, corner_radius=14)
+    card.pack(fill="x", pady=(0, 12), padx=(0, 6))
+    header = row(card, padx=16, pady=(14, 8))
+    ctk.CTkLabel(header, text=str(number), width=26, height=26, corner_radius=13,
+                 fg_color=ACCENT, text_color="white", font=font(13, "bold")).pack(side="left")
+    label(header, title, 15, "bold").pack(side="left", padx=(10, 0))
+    return row(card, padx=16, pady=(0, 14))
 
 
 class App(ctk.CTk):
@@ -148,27 +134,22 @@ class App(ctk.CTk):
         self.minsize(820, 520)
 
         self.settings = load_settings()
-        self.base_image = None
-        self.image_path = None
+        self.base_image = self.image_path = self.names_path = self.custom_font_path = None
         self.names = []
-        self.names_path = None
         self.fonts = {f.label: f for f in cards.available_fonts()}
-        self.custom_font_path = None
         self.color = cards.Placement.color
         self.last_dir = self.settings.get("last_dir") or str(Path.home())
         self.preview_photo = None
         self.preview_scale = 1.0
-        self._preview_job = None
-        self._save_job = None
+        self._preview_job = self._save_job = None
         self._jobs = []
 
-        defaults = cards.Placement()
-        self.placement_vars = {field: tk.StringVar(value=str(getattr(defaults, field))) for field, _ in PLACEMENT_FIELDS}
+        self.placement_vars = {field: tk.StringVar() for field in PLACEMENT_FIELDS}
         self.image_text = tk.StringVar(value="No image chosen yet")
         self.names_text = tk.StringVar(value="No guest list chosen yet")
         self.font_label = tk.StringVar(value=next(iter(self.fonts)))
         self.font_hint = tk.StringVar()
-        self.color_text = tk.StringVar(value=self.color.upper())
+        self.color_text = tk.StringVar()
         self.preview_name = tk.StringVar()
         self.output_dir = tk.StringVar()
         self.prefix = tk.StringVar(value="Invite_")
@@ -176,13 +157,13 @@ class App(ctk.CTk):
 
         self._build_sidebar()
         self._build_preview()
+        self.set_placement(cards.Placement())
         self._restore_window()
         self._restore_settings()
 
-        for var in self.placement_vars.values():
+        for var in [*self.placement_vars.values(), self.preview_name]:
             var.trace_add("write", lambda *_: self.schedule_preview())
-        self.preview_name.trace_add("write", lambda *_: self.schedule_preview())
-        self.font_label.trace_add("write", lambda *_: self.on_font_change())
+        self.font_label.trace_add("write", lambda *_: (self.update_font_hint(), self.schedule_preview()))
         for var in [*self.placement_vars.values(), self.font_label, self.output_dir, self.prefix]:
             var.trace_add("write", lambda *_: self.schedule_save())
         self.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -193,86 +174,73 @@ class App(ctk.CTk):
         sidebar = ctk.CTkFrame(self, fg_color=BG, corner_radius=0)
         sidebar.pack(side="left", fill="y", padx=(16, 8), pady=16)
 
-        header = ctk.CTkFrame(sidebar, fg_color="transparent")
-        header.pack(fill="x", pady=(0, 12))
-        ctk.CTkLabel(header, text=APP_NAME, text_color=TEXT, font=font(22, "bold")).pack(anchor="w")
-        ctk.CTkLabel(
-            header, text="A personalised wedding card for every guest", text_color=MUTED, font=font(13)
-        ).pack(anchor="w")
+        header = row(sidebar, pady=(0, 12))
+        label(header, APP_NAME, 22, "bold").pack(anchor="w")
+        label(header, "A personalised wedding card for every guest", 13, color=MUTED).pack(anchor="w")
 
         # Packed before the scrolling steps so it always stays visible at the bottom
-        footer = ctk.CTkFrame(sidebar, fg_color="transparent")
-        footer.pack(side="bottom", fill="x", pady=(12, 0))
-        self.generate_btn = primary_button(footer, "Generate Cards", self.generate, height=44, font=font(15, "bold"))
+        footer = row(sidebar, side="bottom", pady=(12, 0))
+        self.generate_btn = button(footer, "Generate Cards", self.generate, height=44, font=font(15, "bold"))
         self.generate_btn.pack(fill="x")
         self.progress = ctk.CTkProgressBar(footer, progress_color=ACCENT, fg_color=BORDER, height=6)
         self.progress.set(0)
         self.progress.pack(fill="x", pady=(10, 6))
         muted_label(footer, textvariable=self.status, wraplength=360).pack(fill="x")
 
-        steps = self.steps = ctk.CTkScrollableFrame(
+        steps = ctk.CTkScrollableFrame(
             sidebar, fg_color=BG, width=370, scrollbar_button_color=BORDER, scrollbar_button_hover_color=ACCENT_SOFT
         )
         steps.pack(fill="both", expand=True)
 
         body = step_card(steps, 1, "Invitation image")
-        primary_button(body, "Choose Image", self.choose_image).pack(anchor="w")
+        button(body, "Choose Image", self.choose_image).pack(anchor="w")
         muted_label(body, textvariable=self.image_text).pack(fill="x", pady=(6, 0))
 
         body = step_card(steps, 2, "Guest list")
-        row = ctk.CTkFrame(body, fg_color="transparent")
-        row.pack(fill="x")
-        primary_button(row, "Choose Excel File", self.choose_names).pack(side="left")
-        secondary_button(row, "Download Excel Template", self.save_template).pack(side="left", padx=(8, 0))
+        r = row(body)
+        button(r, "Choose Excel File", self.choose_names).pack(side="left")
+        button(r, "Download Excel Template", self.save_template, "secondary").pack(side="left", padx=(8, 0))
         muted_label(body, textvariable=self.names_text).pack(fill="x", pady=(6, 0))
 
         body = step_card(steps, 3, "Font")
         self.font_menu = option_menu(body, self.font_label, list(self.fonts))
         self.font_menu.pack(fill="x")
-        link_button(body, "Use my own font file…", self.choose_font).pack(anchor="w", pady=(4, 0))
+        button(body, "Use my own font file…", self.choose_font, "link").pack(anchor="w", pady=(4, 0))
         muted_label(body, textvariable=self.font_hint).pack(fill="x")
 
         body = step_card(steps, 4, "Name position")
         muted_label(body, text="Click the preview to place the name, or fine-tune in image pixels.").pack(fill="x")
-        grid = ctk.CTkFrame(body, fg_color="transparent")
-        grid.pack(fill="x", pady=(8, 0))
-        for i, (field, label) in enumerate(PLACEMENT_FIELDS):
-            r, c = i // 2, (i % 2) * 2
-            ctk.CTkLabel(grid, text=label, text_color=TEXT, font=font(12)).grid(row=r, column=c, sticky="w", pady=3)
-            entry(grid, self.placement_vars[field], width=72).grid(row=r, column=c + 1, sticky="w", padx=(6, 14), pady=3)
-        row = ctk.CTkFrame(body, fg_color="transparent")
-        row.pack(fill="x", pady=(8, 0))
-        ctk.CTkLabel(row, text="Colour", text_color=TEXT, font=font(12)).pack(side="left")
-        self.color_btn = ctk.CTkButton(
-            row, text="", width=30, height=26, corner_radius=6, fg_color=self.color, hover_color=self.color,
-            border_width=1, border_color=BORDER, command=self.choose_color,
-        )
+        grid = row(body, pady=(8, 0))
+        for i, (field, text) in enumerate(PLACEMENT_FIELDS.items()):
+            r, c = divmod(i, 2)
+            label(grid, text).grid(row=r, column=c * 2, sticky="w", pady=3)
+            entry(grid, self.placement_vars[field], width=72).grid(row=r, column=c * 2 + 1, sticky="w",
+                                                                   padx=(6, 14), pady=3)
+        r = row(body, pady=(8, 0))
+        label(r, "Colour").pack(side="left")
+        self.color_btn = ctk.CTkButton(r, text="", width=30, height=26, corner_radius=6, border_width=1,
+                                       border_color=BORDER, command=self.choose_color)
         self.color_btn.pack(side="left", padx=(8, 6))
-        ctk.CTkLabel(row, textvariable=self.color_text, text_color=MUTED, font=font(12)).pack(side="left")
-        link_button(row, "Reset position", self.reset_placement).pack(side="right")
-        ctk.CTkLabel(body, text="Preview with", text_color=TEXT, font=font(12)).pack(anchor="w", pady=(10, 2))
+        label(r, textvariable=self.color_text, color=MUTED).pack(side="left")
+        button(r, "Reset position", self.reset_placement, "link").pack(side="right")
+        label(body, "Preview with").pack(anchor="w", pady=(10, 2))
         self.preview_menu = option_menu(body, self.preview_name, [PREVIEW_PLACEHOLDER])
         self.preview_menu.pack(fill="x")
 
         body = step_card(steps, 5, "Save to")
-        row = ctk.CTkFrame(body, fg_color="transparent")
-        row.pack(fill="x")
-        entry(row, self.output_dir).pack(side="left", fill="x", expand=True)
-        secondary_button(row, "Browse", self.choose_output, width=80).pack(side="left", padx=(8, 0))
-        row = ctk.CTkFrame(body, fg_color="transparent")
-        row.pack(fill="x", pady=(8, 0))
-        ctk.CTkLabel(row, text="File name prefix", text_color=TEXT, font=font(12)).pack(side="left")
-        entry(row, self.prefix, width=140).pack(side="left", padx=(8, 0))
+        r = row(body)
+        entry(r, self.output_dir).pack(side="left", fill="x", expand=True)
+        button(r, "Browse", self.choose_output, "secondary", width=80).pack(side="left", padx=(8, 0))
+        r = row(body, pady=(8, 0))
+        label(r, "File name prefix").pack(side="left")
+        entry(r, self.prefix, width=140).pack(side="left", padx=(8, 0))
 
     def _build_preview(self):
         pane = ctk.CTkFrame(self, fg_color=CARD, border_color=BORDER, border_width=1, corner_radius=14)
         pane.pack(side="left", fill="both", expand=True, padx=(8, 16), pady=16)
-        header = ctk.CTkFrame(pane, fg_color="transparent")
-        header.pack(fill="x", padx=18, pady=(14, 8))
-        ctk.CTkLabel(header, text="Preview", text_color=TEXT, font=font(15, "bold")).pack(side="left")
-        ctk.CTkLabel(
-            header, text="Red box: space the name must fit in.  Blue line: centre.", text_color=MUTED, font=font(12)
-        ).pack(side="right")
+        header = row(pane, padx=18, pady=(14, 8))
+        label(header, "Preview", 15, "bold").pack(side="left")
+        label(header, "Red box: space the name must fit in.  Blue line: centre.", color=MUTED).pack(side="right")
 
         area = ctk.CTkFrame(pane, fg_color="transparent")
         area.pack(fill="both", expand=True, padx=14, pady=(0, 14))
@@ -284,24 +252,19 @@ class App(ctk.CTk):
 
         self.canvas.bind("<Configure>", lambda _: self.schedule_preview())
         self.canvas.bind("<Button-1>", self.on_preview_click)
-        self.canvas.bind("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-e.delta / 120), "units"))
-        self.canvas.bind("<Button-4>", lambda _: self.canvas.yview_scroll(-1, "units"))
-        self.canvas.bind("<Button-5>", lambda _: self.canvas.yview_scroll(1, "units"))
+        # Windows/macOS send <MouseWheel> (delta is ±120 on Windows, small values on macOS); Linux sends Button-4/5
+        for event in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+            self.canvas.bind(event, self.on_scroll)
 
-    def _draw_placeholder(self):
-        self.canvas.delete("all")
-        self.canvas.configure(scrollregion=(0, 0, 0, 0))
-        w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
-        self.canvas.create_text(
-            w // 2, h // 2, fill=MUTED, font=("Segoe UI", 13), justify="center",
-            text="Your invitation will appear here.\nStart by choosing an image on the left.",
-        )
+    def on_scroll(self, event):
+        self.canvas.yview_scroll(-1 if event.num == 4 or event.delta > 0 else 1, "units")
 
     # --- Settings ---
 
     def _restore_window(self):
         self.geometry(self.settings.get("geometry") or "1200x800")
-        if self.settings.get("zoomed", sys.platform == "win32"):
+        # "zoomed" (maximised) is a Windows-only window state in Tk
+        if IS_WINDOWS and self.settings.get("zoomed", True):
             self.after(0, lambda: self.state("zoomed"))
 
     def _restore_settings(self):
@@ -318,11 +281,9 @@ class App(ctk.CTk):
         self.output_dir.set(s.get("output_dir", ""))
         self.prefix.set(s.get("prefix", "Invite_"))
 
-        reopened = []
-        if s.get("image") and Path(s["image"]).exists() and self.load_image(s["image"], quiet=True):
-            reopened.append("invitation")
-        if s.get("names") and Path(s["names"]).exists() and self.load_names(s["names"], quiet=True):
-            reopened.append("guest list")
+        reopened = [what for what, key, load in [("invitation", "image", self.load_image),
+                                                 ("guest list", "names", self.load_names)]
+                    if s.get(key) and Path(s[key]).exists() and load(s[key], quiet=True)]
         self.update_font_hint()
         if reopened:
             verb = "were" if len(reopened) > 1 else "was"
@@ -336,7 +297,7 @@ class App(ctk.CTk):
     def save_now(self):
         self._save_job = None
         zoomed = self.state() == "zoomed"
-        if not zoomed:
+        if not zoomed:  # keep the last normal-size geometry, so un-maximising restores it
             self.settings["geometry"] = self.geometry()
         save_settings({
             "placement": {field: var.get() for field, var in self.placement_vars.items()},
@@ -349,7 +310,6 @@ class App(ctk.CTk):
             "names": self.names_path,
             "last_dir": self.last_dir,
             "zoomed": zoomed,
-            # The last normal-size geometry, so un-maximising restores it
             "geometry": self.settings.get("geometry"),
         })
 
@@ -398,16 +358,14 @@ class App(ctk.CTk):
     def load_names(self, path, quiet=False):
         try:
             names = cards.read_names(path)
+            if not names:
+                raise ValueError("Put one name per row in column A of the first sheet.")
         except Exception as e:
             if not quiet:
                 messagebox.showerror("Could not read guest list", str(e))
             return False
-        if not names:
-            if not quiet:
-                messagebox.showwarning("No names found", "Put one name per row in column A of the first sheet.")
-            return False
         self.names, self.names_path = names, str(Path(path).resolve())
-        self.names_text.set(f"{Path(path).name}  ·  {len(names)} guest{'s' if len(names) != 1 else ''}")
+        self.names_text.set(f"{Path(path).name}  ·  {plural(len(names), 'guest')}")
         self.preview_menu.configure(values=names)
         self.preview_name.set(names[0])
         self.update_font_hint()
@@ -436,7 +394,7 @@ class App(ctk.CTk):
             messagebox.showerror("Could not save template", str(e))
             return
         if messagebox.askyesno("Template saved", f"Saved to {path}.\n\nOpen the folder now?"):
-            open_folder(str(Path(path).parent))
+            open_folder(self.last_dir)
 
     def choose_font(self):
         path = self._ask_open(title="Choose font", filetypes=[("Fonts", "*.ttf *.otf")])
@@ -460,18 +418,12 @@ class App(ctk.CTk):
     def font(self):
         return self.fonts[self.font_label.get()]
 
-    def on_font_change(self):
-        self.update_font_hint()
-        self.schedule_preview()
-
     def update_font_hint(self):
         hint = ""
         if self.font.chinese is False and any(cards.has_chinese(n) for n in self.names):
             fallback = cards.chinese_fallback()
-            hint = (
-                f"Names in Chinese will use {fallback.label.split('  ')[0]}." if fallback
-                else "Some names are in Chinese. Choose a font that supports Chinese."
-            )
+            hint = (f"Names in Chinese will use {fallback.label.split('  ')[0]}." if fallback
+                    else "Some names are in Chinese. Choose a font that supports Chinese.")
         self.font_hint.set(hint)
 
     def choose_color(self):
@@ -486,11 +438,13 @@ class App(ctk.CTk):
         self.color_btn.configure(fg_color=hex_color, hover_color=hex_color)
         self.color_text.set(hex_color.upper())
 
-    def reset_placement(self):
-        defaults = cards.Placement()
+    def set_placement(self, p):
         for field, var in self.placement_vars.items():
-            var.set(str(getattr(defaults, field)))
-        self._set_color(defaults.color)
+            var.set(str(getattr(p, field)))
+        self._set_color(p.color)
+
+    def reset_placement(self):
+        self.set_placement(cards.Placement())
         self.after(200, self.scroll_to_name)
 
     def choose_output(self):
@@ -517,7 +471,12 @@ class App(ctk.CTk):
     def render_preview(self):
         self._preview_job = None
         if self.base_image is None:
-            self._draw_placeholder()
+            self.canvas.delete("all")
+            self.canvas.configure(scrollregion=(0, 0, 0, 0))
+            self.canvas.create_text(
+                self.canvas.winfo_width() // 2, self.canvas.winfo_height() // 2, fill=MUTED, font=font(13),
+                justify="center", text="Your invitation will appear here.\nStart by choosing an image on the left.",
+            )
             return
         p = self.placement()
         if p is None:
@@ -528,10 +487,8 @@ class App(ctk.CTk):
         draw = ImageDraw.Draw(img)
         width = max(2, img.width // 400)
         draw.rectangle([p.x_min, p.base_y, p.x_max, p.max_y + p.max_font_size], outline="#dc2626", width=width)
-        draw.line(
-            [p.x_center, p.base_y - p.max_font_size // 2, p.x_center, p.max_y + p.max_font_size * 3 // 2],
-            fill="#2563eb", width=width,
-        )
+        draw.line([p.x_center, p.base_y - p.max_font_size // 2, p.x_center, p.max_y + p.max_font_size * 3 // 2],
+                  fill="#2563eb", width=width)
 
         canvas_width = max(self.canvas.winfo_width(), 200)
         self.preview_scale = canvas_width / img.width
@@ -546,8 +503,8 @@ class App(ctk.CTk):
         if self.base_image is None or p is None:
             return
         self.update_idletasks()
-        offset = p.base_y / self.base_image.height - self.canvas.winfo_height() / 2 / (self.base_image.height * self.preview_scale)
-        self.canvas.yview_moveto(max(0.0, offset))
+        h = self.base_image.height
+        self.canvas.yview_moveto(max(0.0, p.base_y / h - self.canvas.winfo_height() / 2 / (h * self.preview_scale)))
 
     def on_preview_click(self, event):
         p = self.placement()
@@ -570,18 +527,15 @@ class App(ctk.CTk):
 
     def generate(self):
         p = self.placement()
-        if self.base_image is None:
-            messagebox.showwarning("Missing image", "Choose an invitation image first.")
-            return
-        if not self.names:
-            messagebox.showwarning("Missing guest list", "Choose an Excel guest list first.")
-            return
-        if p is None:
-            messagebox.showwarning("Check position", "Position values must be whole numbers.")
-            return
-        if not self.output_dir.get().strip():
-            messagebox.showwarning("Missing folder", "Choose where to save the cards.")
-            return
+        for missing, title, message in [
+            (self.base_image is None, "Missing image", "Choose an invitation image first."),
+            (not self.names, "Missing guest list", "Choose an Excel guest list first."),
+            (p is None, "Check position", "Position values must be whole numbers."),
+            (not self.output_dir.get().strip(), "Missing folder", "Choose where to save the cards."),
+        ]:
+            if missing:
+                messagebox.showwarning(title, message)
+                return
 
         out = Path(self.output_dir.get().strip())
         try:
@@ -590,8 +544,7 @@ class App(ctk.CTk):
             messagebox.showerror("Could not create folder", str(e))
             return
 
-        self._jobs = list(self.names)
-        self._total = len(self._jobs)
+        self._jobs, self._total = list(self.names), len(self.names)
         self._out, self._placement, self._font, self._used = out, p, self.font, set()
         self.progress.set(0)
         self.generate_btn.configure(state="disabled", text="Generating…")
@@ -601,8 +554,7 @@ class App(ctk.CTk):
 
     def _generate_next(self):
         if not self._jobs:
-            self._finish()
-            return
+            return self._finish()
         name = self._jobs.pop(0)
         filename = cards.safe_filename(name, self.prefix.get())
         stem, n = filename[:-4], 2
@@ -626,9 +578,9 @@ class App(ctk.CTk):
     def _finish(self):
         count = len(self._used)
         self.generate_btn.configure(state="normal", text="Generate Cards")
-        self.status.set(f"Done! Created {count} card{'s' if count != 1 else ''} in {self._out}")
-        if messagebox.askyesno("All done", f"Created {count} card(s).\n\nOpen the folder now?"):
-            open_folder(str(self._out))
+        self.status.set(f"Done! Created {plural(count, 'card')} in {self._out}")
+        if messagebox.askyesno("All done", f"Created {plural(count, 'card')}.\n\nOpen the folder now?"):
+            open_folder(self._out)
 
 
 def main():
